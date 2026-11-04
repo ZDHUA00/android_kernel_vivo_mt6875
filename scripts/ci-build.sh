@@ -52,6 +52,14 @@ build() {
     export KBUILD_BUILD_USER=pd2048
     export KBUILD_BUILD_HOST=gha
 
+    # clang builds its external-assembler path from --prefix; point that at a
+    # directory whose `as` is the cross assembler (see the Makefile patch).
+    export CROSS_BIN_DIR="$ROOT/toolchains/crossbin"
+    mkdir -p "$CROSS_BIN_DIR"
+    ln -sf "$(command -v "${CROSS_PREFIX}as")" "$CROSS_BIN_DIR/as"
+    ln -sf "$(command -v "${CROSS_PREFIX}objcopy")" "$CROSS_BIN_DIR/objcopy"
+    ln -sf "$(command -v "${CROSS_PREFIX}strip")" "$CROSS_BIN_DIR/strip"
+
     # clang compiles C; GNU binutils (aarch64-linux-gnu) provides as/objcopy;
     # lld links. This avoids the fragile AOSP gcc-4.9 prebuilt package.
     local make_args=(
