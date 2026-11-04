@@ -52,6 +52,22 @@ build() {
     export KBUILD_BUILD_USER=pd2048
     export KBUILD_BUILD_HOST=gha
 
+    # The prebuilt archive layout varies (bin/ vs aarch64-linux-android-4.9/bin/),
+    # so resolve the binutils prefix instead of assuming it.
+    if [ ! -x "$GCC_DIR/bin/aarch64-linux-android-gcc" ]; then
+        local f
+        f="$(find "$ROOT/toolchains/gcc" -maxdepth 6 \
+              \( -name 'aarch64-linux-android-gcc' -o -name 'aarch64-linux-android-gcc-4.9' \) \
+              2>/dev/null | head -1)"
+        if [ -n "$f" ]; then
+            GCC_DIR="$(dirname "$(dirname "$f")")"
+            log "gcc prefix resolved to $GCC_DIR"
+        else
+            log "gcc layout:"; find "$ROOT/toolchains/gcc" -maxdepth 3 | head -30
+            die "gcc 4.9 not found under $ROOT/toolchains/gcc"
+        fi
+    fi
+
     # Mirrors the vendor/community build (bomb-build.sh): clang for C, gcc 4.9
     # binutils via CROSS_COMPILE, lld as linker.
     local make_args=(
