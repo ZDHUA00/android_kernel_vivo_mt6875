@@ -59,6 +59,10 @@ testing it on hardware.
   `LE32(0x4C501CC4)` + `LE32(0x4C42F3B9)`, i.e. r4 = verify_global-0x64,
   r5 = dispatcher state, lr = gadget|thumb. All bytes are free of NUL/space.
 * driver script: `lkfuzz/exploit_clear_verify.py` (`--dump` verified, `--fire` sends)
+* **gadget validated in Unicorn** (`lkfuzz/emu_gadget.py`): starting with
+  `r4=0x4C4C6A50, r2=0, lr=0x4C42D7BA, r5=0x4C501CC4, sp=0x4C79A410`, execution at
+  `0x4C42F3B8` sets `[0x4C4C6AB4]` from 1 to 0, branches via `bx lr` to
+  `0x4C42D7BA`, and leaves r5/sp untouched.
 * open question: whether r2 is 0 at the hijack (the panic dumps say 0). If it is
   not, the store writes a non-zero value, LK survives, and another gadget can be
   tried.
