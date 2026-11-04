@@ -51,6 +51,10 @@ jobs:
             cpio rsync python3 perl git curl ca-certificates file \
             binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu
           aarch64-linux-gnu-as --version | head -1
+          echo "--- which ---"
+          which aarch64-linux-gnu-as || true
+          which aarch64-linux-gnu-elfedit || true
+          ls /usr/bin/aarch64-linux-gnu-* | head -30
 
       - name: Cache clang
         id: tc-cache
