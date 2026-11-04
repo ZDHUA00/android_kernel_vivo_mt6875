@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# Build driver for the PD2048 (vivo S9e / MT6875) kernel port.
+# Runs inside GitHub Actions, but is plain bash so it also works on any Linux box.
+#
+#   ./scripts/ci-build.sh apply   # copy overlay/ into the kernel tree, apply patches/
+#   ./scripts/ci-build.sh build   # configure + compile
+#
+# Env knobs: KERNEL_DIR, CLANG_DIR, GCC_DIR, DEFCONFIG, TARGET, JOBS, KCFLAGS
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+KERNEL_DIR="${KERNEL_DIR:-$ROOT/kernel}"
+CLANG_DIR="${CLANG_DIR:-$ROOT/toolchains/clang}"
+GCC_DIR="${GCC_DIR:-$ROOT/toolchains/gcc}"
+DEFCONFIG="${DEFCONFIG:-bomb_user_defconfig}"
+TARGET="${TARGET:-Image.gz}"
+JOBS="${JOBS:-8}"
+
+log() { printf '\n\033[1;32m==> %s\033[0m\n' "$*"; }
+die() { printf '\033[1;31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
+
+apply() {
+    [ -d "$KERNEL_DIR" ] || die "kernel tree missing: $KERNEL_DIR"
+
+    if [ -d "$ROOT/overlay" ]; then
+        log "copying overlay/ into kernel tree"
+        cp -a "$ROOT/overlay/." "$KERNEL_DIR"/
+    fi
+
+    shopt -s nullglob
+    local patches=("$ROOT"/patches/*.patch)
+    if [ ${#patches[@]} -gt 0 ]; then
+        for p in "${patches[@]}"; do
+            log "applying $(basename "$p")"
+            git -C "$KERNEL_DIR" apply --whitespace=nowarn -p1 "$p" \
+                || die "patch failed: $p"
+        done
+    else
+        log "no patches/ entries"
+    fi
+    shopt -u nullglob
+}
+
+build() {
+    [ -d "$KERNEL_DIR" ] || die "kernel tree missing: $KERNEL_DIR"
+    [ -x "$CLANG_DIR/bin/clang" ] || die "clang missing: $CLANG_DIR/bin/clang"
+    [ -x "$GCC_DIR/bin/aarch64-linux-android-gcc" ] || die "gcc 4.9 missing: $GCC_DIR"
+
+    export PATH="$CLANG_DIR/bin:$PATH"
+    export ARCH=arm64
+    export SUBARCH=arm64
+    export KBUILD_BUILD_USER=pd2048
+    export KBUILD_BUILD_HOST=gha
+
+    # Mirrors the vendor/community build (bomb-build.sh): clang for C, gcc 4.9
+    # binutils via CROSS_COMPILE, lld as linker.
+    local make_args=(
+        O=out
+        ARCH=arm64
+        CC=clang
+        LD=ld.lld
+        CLANG_TRIPLE=aarch64-linux-gnu-
+        CROSS_COMPILE="$GCC_DIR/bin/aarch64-linux-android-"
+    )
+
+    cd "$KERNEL_DIR"
+    log "kernel $(make kernelversion 2>/dev/null || echo unknown), defconfig=$DEFCONFIG"
+    log "configure"
+    make "${make_args[@]}" "$DEFCONFIG"
+
+    log "compile with -j$JOBS"
+    set +e
+    make -j"$JOBS" "${make_args[@]}" ${KCFLAGS:+KCFLAGS="$KCFLAGS"} "$TARGET" 2>&1 | tee error.log
+    local rc=${PIPESTATUS[0]}
+    set -e
+    if [ "$rc" -ne 0 ]; then
+        log "BUILD FAILED (rc=$rc); last errors:"
+        grep -E "error:|Error [0-9]" error.log | tail -50 || true
+        exit "$rc"
+    fi
+
+    log "output:"
+    ls -lh "out/arch/arm64/boot/$TARGET"
+    file "out/arch/arm64/boot/$TARGET" || true
+}
+
+case "${1:-}" in
+    apply) apply ;;
+    build) build ;;
+    *) die "usage: $0 {apply|build}" ;;
+esac
