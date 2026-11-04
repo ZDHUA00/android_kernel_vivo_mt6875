@@ -59,7 +59,7 @@ build() {
         ARCH=arm64
         CC=clang
         LD=ld.lld
-        CLANG_TRIPLE=aarch64-linux-gnu-
+        CLANG_TRIPLE=aarch64-linux-gnu
         CROSS_COMPILE="$CROSS_PREFIX"
     )
 
