@@ -58,7 +58,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: toolchains
-          key: tc-r416183b-gcc49-v1
+          key: tc-r416183b-gcc49-v2
 
       - name: Fetch toolchains
         if: steps.tc-cache.outputs.cache-hit != 'true'
@@ -70,6 +70,13 @@ jobs:
           tar -C toolchains/gcc -zxf /tmp/gcc.tar.gz
           rm -f /tmp/clang.tar.gz /tmp/gcc.tar.gz
           ./toolchains/clang/bin/clang --version | head -1
+
+      - name: Toolchain layout
+        run: |
+          echo "--- clang ---"; ls -la toolchains/clang | head -8
+          echo "--- gcc ---"; ls -la toolchains/gcc | head -12
+          find toolchains/gcc -maxdepth 4 -name 'aarch64-linux-android-*' | head -20 || true
+          echo "--- disk ---"; df -h /
 
       - name: Clone kernel source
         run: |
