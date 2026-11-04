@@ -53,6 +53,32 @@ expected to be handled by merging subsystems, not one-by-one ports.
   drivers have to be recovered from the stock `Image` (kallsyms + disassembly)
   or backported from another vivo drop.
 
+## Build-verified gaps (stock config on the bomb tree)
+
+Building `pd2048_defconfig` (the stock `/proc/config.gz`) on the bomb tree exposes
+the real, compiler-confirmed gaps — much more precise than the compatible-string
+inventory:
+
+1. `drivers/gpu/drm/drm_gem.c` and `drivers/input/touchscreen/GT9886` need
+   `-I drivers/gpu/drm/mediatek/`, which the Makefiles only add under
+   `CONFIG_DRM_MEDIATEK_BOMB`. The stock config only sets vivo's
+   `CONFIG_DRM_MEDIATEK`. **Fix: add `CONFIG_DRM_MEDIATEK_BOMB=y`** (done).
+2. `CONFIG_EXTRA_FIRMWARE` listed `tfa98xx_PD2048.cnt`, which is not in the tree.
+   **Fix: keep only `valhall-1691526.wa`** (done); the amp firmware can be loaded
+   from `/vendor/firmware` at runtime.
+3. `mtk_battery_core.c` uses `of_find_device_by_node`, `iio_channel_get`,
+   `iio_read_channel_processed` — the stock config enables the battery driver but
+   the IIO pieces are not selected on the bomb tree.
+4. `drivers/misc/mediatek/base/power/swpm_v1/mtk_swpm.c` needs
+   `mtk_gpu_power_sspm_ipi.h` (exists in the stock tree only).
+5. `mali-r32p1/drivers/gpu/arm/midgard/Makefile` and
+   `imgsensor/.../gc02m1bv1_mipi_mono/Makefile` are referenced by the stock config
+   but absent from the bomb tree (different Mali/sensor layout).
+
+Conclusion: adopting the stock config wholesale means porting a lot of vivo
+structure. The practical order is **bomb defconfig first (already green)**, then add
+PD2048 pieces one subsystem at a time.
+
 ## Bring-up order
 
 1. boot with stock DTB, no display, adb only — validates UFS/USB/CPU
