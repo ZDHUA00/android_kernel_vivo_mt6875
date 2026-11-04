@@ -33,6 +33,15 @@ Disassembly of `fb_do_verify` (0x30fcc): the global at `.data` payload 0xC6CB4
 successful RSA-2048 signed `verify:unlock`. An unlocked seccfg (`lock_state=3`,
 `getvar unlocked:yes`, boot state orange) does not affect it.
 
+### ultraflash does NOT bypass the gate (verified by disassembly)
+
+`oem ultraflash_en 1` sets a flag; the flash handler then calls `0x3795c`, which is
+a **partition-name whitelist** (17 names, 0x20 bytes each). It returns 1 when the
+name is whitelisted, and the handler then branches **back to the normal path**
+(0x37aca → 0x37620 → 0x3734c → `fb_get_verify_unlock_state`). Non-whitelisted names
+fail with a message. So enabling ultraflash cannot skip the verify check — no point
+testing it on hardware.
+
 ## Known-good facts for the exploit work
 
 * hijack stack pointer from expdb panic dumps: `S = 0x4C79A410` (three dumps, identical)
