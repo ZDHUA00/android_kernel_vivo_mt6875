@@ -15,8 +15,6 @@ on:
         description: "parallel jobs"
         required: false
         default: "8"
-  push:
-    branches: [ main ]
 
 permissions:
   contents: read
@@ -33,7 +31,6 @@ jobs:
       TARGET: ${{ github.event.inputs.target || 'Image.gz' }}
       JOBS: ${{ github.event.inputs.jobs || '8' }}
       CLANG_URL: https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android12-release/clang-r416183b.tar.gz
-      GCC_URL: https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/android-11.0.0_r35.tar.gz
 
     steps:
       - name: Checkout
@@ -51,32 +48,25 @@ jobs:
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             build-essential bc bison flex libssl-dev libelf-dev zip unzip xz-utils \
-            cpio rsync python3 perl git curl ca-certificates
+            cpio rsync python3 perl git curl ca-certificates file \
+            binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu
+          aarch64-linux-gnu-as --version | head -1
 
-      - name: Cache toolchains
+      - name: Cache clang
         id: tc-cache
         uses: actions/cache@v4
         with:
-          path: toolchains
-          key: tc-r416183b-gcc49-v2
+          path: toolchains/clang
+          key: clang-r416183b-v3
 
-      - name: Fetch toolchains
+      - name: Fetch clang
         if: steps.tc-cache.outputs.cache-hit != 'true'
         run: |
-          mkdir -p toolchains/clang toolchains/gcc
+          mkdir -p toolchains/clang
           curl -fL --retry 5 --retry-delay 5 -o /tmp/clang.tar.gz "$CLANG_URL"
           tar -C toolchains/clang -zxf /tmp/clang.tar.gz
-          curl -fL --retry 5 --retry-delay 5 -o /tmp/gcc.tar.gz "$GCC_URL"
-          tar -C toolchains/gcc -zxf /tmp/gcc.tar.gz
-          rm -f /tmp/clang.tar.gz /tmp/gcc.tar.gz
+          rm -f /tmp/clang.tar.gz
           ./toolchains/clang/bin/clang --version | head -1
-
-      - name: Toolchain layout
-        run: |
-          echo "--- clang ---"; ls -la toolchains/clang | head -8
-          echo "--- gcc ---"; ls -la toolchains/gcc | head -12
-          find toolchains/gcc -maxdepth 4 -name 'aarch64-linux-android-*' | head -20 || true
-          echo "--- disk ---"; df -h /
 
       - name: Clone kernel source
         run: |
