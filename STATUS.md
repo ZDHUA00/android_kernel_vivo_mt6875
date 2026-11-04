@@ -73,6 +73,9 @@ testing it on hardware.
 3. if r2 was not zero: try a gadget storing r1, or find another write primitive.
 4. independent of the gate: GSI on the `super` partition (fastbootd can write
    logical partitions) — keeps the stock kernel.
+   * GSI: `_research/gsi/lineage-20.0-arm64_bvN.img`, raw ext4, 2,242,465,792 B
+     (2.09 GiB) — fits the 7,652,802,560 B system partition.
+   * `_research/scripts/flash_gsi.py` reboots to fastbootd and flashes it.
 
 ## Rollback
 
