@@ -92,8 +92,8 @@ jobs:
           cp kernel/out/arch/arm64/boot/Image* artifacts/ 2>/dev/null || true
           cp kernel/out/.config artifacts/config.txt 2>/dev/null || true
           cp kernel/out/System.map artifacts/ 2>/dev/null || true
-          cp kernel/out/vmlinux artifacts/ 2>/dev/null || true
           cp kernel/error.log artifacts/ 2>/dev/null || true
+          gzip -9 -f artifacts/System.map artifacts/config.txt 2>/dev/null || true
           ls -lh artifacts
 
       - name: Upload artifacts
