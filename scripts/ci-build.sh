@@ -52,15 +52,6 @@ build() {
     export KBUILD_BUILD_USER=pd2048
     export KBUILD_BUILD_HOST=gha
 
-    # The kernel forces clang's external assembler (-no-integrated-as) and builds
-    # --prefix from `which $(CROSS_COMPILE)elfedit`. When that lookup fails clang
-    # falls back to the host `as`, so pin a shim named `as` to the cross one.
-    local shim="$ROOT/toolchains/shim"
-    mkdir -p "$shim"
-    ln -sf "$(command -v "${CROSS_PREFIX}as")" "$shim/as"
-    ln -sf "$(command -v "${CROSS_PREFIX}objcopy")" "$shim/objcopy"
-    export PATH="$shim:$PATH"
-
     # clang compiles C; GNU binutils (aarch64-linux-gnu) provides as/objcopy;
     # lld links. This avoids the fragile AOSP gcc-4.9 prebuilt package.
     local make_args=(
