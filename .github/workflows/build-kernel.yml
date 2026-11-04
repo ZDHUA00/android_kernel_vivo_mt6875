@@ -1,0 +1,105 @@
+name: build-kernel
+
+on:
+  workflow_dispatch:
+    inputs:
+      defconfig:
+        description: "kernel defconfig name (in arch/arm64/configs)"
+        required: false
+        default: bomb_user_defconfig
+      target:
+        description: "make target"
+        required: false
+        default: Image.gz
+      jobs:
+        description: "parallel jobs"
+        required: false
+        default: "8"
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 300
+
+    env:
+      KERNEL_REPO: https://github.com/xszx/kernel_xiaomi_bomb
+      KERNEL_REF: cezanne-r-oss
+      DEFCONFIG: ${{ github.event.inputs.defconfig || 'bomb_user_defconfig' }}
+      TARGET: ${{ github.event.inputs.target || 'Image.gz' }}
+      JOBS: ${{ github.event.inputs.jobs || '8' }}
+      CLANG_URL: https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android12-release/clang-r416183b.tar.gz
+      GCC_URL: https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/android-11.0.0_r35.tar.gz
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL \
+                      /usr/local/share/boost /usr/share/swift /usr/lib/jvm
+          sudo apt-get clean
+          df -h /
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential bc bison flex libssl-dev libelf-dev zip unzip xz-utils \
+            cpio rsync python3 perl git curl ca-certificates
+
+      - name: Cache toolchains
+        id: tc-cache
+        uses: actions/cache@v4
+        with:
+          path: toolchains
+          key: tc-r416183b-gcc49-v1
+
+      - name: Fetch toolchains
+        if: steps.tc-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p toolchains/clang toolchains/gcc
+          curl -fL --retry 5 --retry-delay 5 -o /tmp/clang.tar.gz "$CLANG_URL"
+          tar -C toolchains/clang -zxf /tmp/clang.tar.gz
+          curl -fL --retry 5 --retry-delay 5 -o /tmp/gcc.tar.gz "$GCC_URL"
+          tar -C toolchains/gcc -zxf /tmp/gcc.tar.gz
+          rm -f /tmp/clang.tar.gz /tmp/gcc.tar.gz
+          ./toolchains/clang/bin/clang --version | head -1
+
+      - name: Clone kernel source
+        run: |
+          git clone --depth 1 -b "$KERNEL_REF" "$KERNEL_REPO" kernel
+          cd kernel
+          git log --oneline -1
+          head -5 Makefile
+
+      - name: Apply overlay and patches
+        run: bash scripts/ci-build.sh apply
+
+      - name: Build kernel
+        run: bash scripts/ci-build.sh build
+
+      - name: Collect artifacts
+        if: always()
+        run: |
+          mkdir -p artifacts
+          cp kernel/out/arch/arm64/boot/Image* artifacts/ 2>/dev/null || true
+          cp kernel/out/.config artifacts/config.txt 2>/dev/null || true
+          cp kernel/out/System.map artifacts/ 2>/dev/null || true
+          cp kernel/out/vmlinux artifacts/ 2>/dev/null || true
+          cp kernel/error.log artifacts/ 2>/dev/null || true
+          ls -lh artifacts
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-${{ github.run_number }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 14
