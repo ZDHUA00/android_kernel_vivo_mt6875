@@ -70,7 +70,7 @@ build() {
 
     log "compile with -j$JOBS"
     set +e
-    make -j"$JOBS" "${make_args[@]}" ${KCFLAGS:+KCFLAGS="$KCFLAGS"} "$TARGET" 2>&1 | tee error.log
+    make -j"$JOBS" "${make_args[@]}" V=1 ${KCFLAGS:+KCFLAGS="$KCFLAGS"} "$TARGET" 2>&1 | tee error.log
     local rc=${PIPESTATUS[0]}
     set -e
     if [ "$rc" -ne 0 ]; then
