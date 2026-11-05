@@ -6,7 +6,7 @@ _Last updated: 2026-11-05_
 
 | item | evidence |
 |---|---|
-| Kernel builds from bomb (MT6875, 4.14.186) source | Actions runs 41913446650 / 41917885106 `success` |
+| Kernel builds from bomb (MT6875, 4.14.186) source with `bomb_user_defconfig` | runs 41913446650 / 41917885106 and run #29 on HEAD all `success`; the stock `pd2048_defconfig` is still red at gaps 3/4/6 (`docs/driver-gaps.md`) |
 | Artifact | `Image.gz` 13,343,894 B, `Image` 35,717,136 B, version string `4.14.186+ (pd2048@gha)` |
 | Boot image assembled with stock DTB + ramdisk | `boot_pd2048_test.img`, 100,663,296 B, header v2, DTBO `d7b7ab1e`, DTB 160,015 B |
 | Toolchain recipe | see README "Toolchain notes"; `patches/0001-clang-cross-toolchain-dir.patch` |

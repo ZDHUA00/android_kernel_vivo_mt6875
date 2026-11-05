@@ -74,10 +74,19 @@ inventory:
 5. `mali-r32p1/drivers/gpu/arm/midgard/Makefile` and
    `imgsensor/.../gc02m1bv1_mipi_mono/Makefile` are referenced by the stock config
    but absent from the bomb tree (different Mali/sensor layout).
+6. **New (CI run #28):** `CONFIG_MTK_GPU_VERSION="mali valhall r32p1"` in the
+   current stock defconfig has no matching `mali-r32p1` directory in the bomb tree
+   (only `mali-r21p0` / `mali-r25p0`), so
+   `drivers/misc/mediatek/base/power/swpm_v1/mtk_swpm.c` cannot find
+   `mtk_gpu_power_sspm_ipi.h`. **Fix for bring-up: keep `r25p0`** (what the green
+   `bomb_user_defconfig` uses), or disable
+   `CONFIG_MTK_GPU_SWPM_SUPPORT` / `CONFIG_MTK_GPU_SUPPORT`.
 
 Conclusion: adopting the stock config wholesale means porting a lot of vivo
 structure. The practical order is **bomb defconfig first (already green)**, then add
-PD2048 pieces one subsystem at a time.
+PD2048 pieces one subsystem at a time. The CI default input is therefore
+`bomb_user_defconfig`; `pd2048_defconfig` is the target config and is still red at
+items 3, 4 and 6.
 
 ## Bring-up order
 
