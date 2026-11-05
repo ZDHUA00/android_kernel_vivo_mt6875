@@ -11,7 +11,8 @@ _Last updated: 2026-11-05_
 | Boot image assembled with stock DTB + ramdisk | `boot_pd2048_test.img`, 100,663,296 B, header v2, DTBO `d7b7ab1e`, DTB 160,015 B |
 | Toolchain recipe | see README "Toolchain notes"; `patches/0001-clang-cross-toolchain-dir.patch` |
 | Stock-config gap list | `docs/driver-gaps.md`, 5 compiler-verified items, 2 fixed |
-| **Kernel can be test-booted without flashing boot** | recovery.img carries the *same* kernel as boot.img — see `docs/recovery-testbed.md` |
+| **Recovery test bed plumbing works** | image builds, flashes and boots from `recovery`; but both kernels hang before USB — see `docs/recovery-testbed.md` |
+| **Rescue from a persistent recovery BCB** | `docs/lk-bcb-clear.md`; reproduced twice on hardware |
 
 ## What is blocked: fastboot flashing
 
@@ -104,8 +105,11 @@ recovery.img  kernel 14,168,565 B  md5 2f17f1623ddd2462ac1298d39e3520ba   # iden
 
 ## Next actions (in order)
 
-1. Recovery test bed: boot `Image.gz` via recovery, confirm `/proc/version`, and
-   collect `dmesg` probe failures. This is the feedback loop for driver work.
+1. **Early-boot debugging.** Both `pd2048_defconfig` and `bomb_user_defconfig`
+   hang before USB init when booted from recovery. Do not swap configs blindly:
+   first make the kernel leave a log — enable `pstore`/`ramoops` and read
+   `/sys/fs/pstore` after the next normal boot, or check `expdb` (sdc4) for a
+   watchdog CPU dump.
 2. Merge the stock PD2048 DTS (extracted from boot.img, DTB at file offset
    15,794,240) into the bomb tree, then fill the gaps listed in
    `docs/driver-gaps.md` (13 vivo-private compatibles, 3 panel, 6 peripherals).
@@ -113,6 +117,8 @@ recovery.img  kernel 14,168,565 B  md5 2f17f1623ddd2462ac1298d39e3520ba   # iden
    logical partitions) — keeps the stock kernel.
 4. LK gate (long-term): a handler with a different return path, or a
    write-and-die primitive (UFS WP clear) that persists across reboot.
+
+If a recovery test hangs, recover with `docs/lk-bcb-clear.md` (tested twice).
 
 ## Rollback
 

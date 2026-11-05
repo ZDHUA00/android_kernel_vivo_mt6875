@@ -62,6 +62,24 @@ recovery.img  kernel 14,168,565 B  md5 2f17f1623ddd2462ac1298d39e3520ba
 自动化脚本：`tools/test_kernel_via_recovery.py`（push → 写 → 回读校验 → BCB → 重启 →
 读 `/proc/version`；支持 `--check` 只看不写）。
 
+## 实测结果（2026-11-05，PD2048 6.13.30 真机）
+
+| 内核 | 结果 |
+|---|---|
+| `pd2048_defconfig`（stock config，kernel-31） | 挂死：重启后约 30 s 从 USB 总线完全消失，adb/fastboot 都不枚举 |
+| `bomb_user_defconfig`（kernel-29） | 同样挂死，USB 不枚举 |
+
+两种配置都在 **USB 初始化之前** 就停了，说明不是配置差异，而是更早的启动阶段
+（DTB / 内存布局 / 早期驱动）。下一步不要继续盲换配置，要先拿到早期日志：
+
+* 打开 `pstore`/`ramoops`，让内核把 panic 写进保留内存，重启后在 Android 里读
+  `/sys/fs/pstore`；
+* 或读 `expdb`（sdc4）看 watchdog 复位时 LK 是否留下了 CPU 状态。
+
+**挂死后怎么救回来**：BCB 是持久的，`fastboot reboot` 也会回到 recovery。进 LK fastboot
+后运行 `lkfuzz/exploit_clear_bcb.py --fire`（细节见 `docs/lk-bcb-clear.md`），把 misc 的
+命令字段写成空，再启动就会走正常 Android。该流程已在真机上复验两次。
+
 ## 局限
 
 * 面板驱动没移植时屏幕不亮，只能靠 adb；这是预期行为，不是启动失败。
