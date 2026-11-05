@@ -76,6 +76,16 @@ recovery.img  kernel 14,168,565 B  md5 2f17f1623ddd2462ac1298d39e3520ba
   `/sys/fs/pstore`；
 * 或读 `expdb`（sdc4）看 watchdog 复位时 LK 是否留下了 CPU 状态。
 
+**expdb 证据（2026-11-05）**：recovery 会话的 LK 日志里有
+`[avb] recovery: Error verifying vbmeta image: invalid vbmeta header`（预期内，BL 已解锁，
+LK 仍继续），紧接着是 `====> GZ (0)[0.026896] Kernel table root va=0x3820e800 ...`，
+但 expdb 里**没有任何内核日志**（无 `Booting Linux` / `Linux version` /
+`Kernel command line`）。内核确实被执行了，但挂在 console 初始化之前。最可能的原因是
+PD2048（Android 13，较新的 GZ/ATF 安全世界）与 bomb 内核（Android 11）的 GZ/ATF ABI
+不兼容，在 `setup_arch`/页表初始化阶段停住。DTS 里没有 `ramoops` 节点（只有
+`mrdump_ext_rst`），要早期日志得自己加保留内存 + `CONFIG_PSTORE_RAM`，或走 MTK
+AEE/mrdump 的 DDR 保留区。
+
 **挂死后怎么救回来**：BCB 是持久的，`fastboot reboot` 也会回到 recovery。进 LK fastboot
 后运行 `lkfuzz/exploit_clear_bcb.py --fire`（细节见 `docs/lk-bcb-clear.md`），把 misc 的
 命令字段写成空，再启动就会走正常 Android。该流程已在真机上复验两次。
