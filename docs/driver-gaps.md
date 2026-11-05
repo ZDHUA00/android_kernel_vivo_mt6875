@@ -68,25 +68,31 @@ inventory:
    from `/vendor/firmware` at runtime.
 3. `mtk_battery_core.c` uses `of_find_device_by_node`, `iio_channel_get`,
    `iio_read_channel_processed` — the stock config enables the battery driver but
-   the IIO pieces are not selected on the bomb tree.
+   the headers were missing. **Fixed**: `patches/0002-battery-iio-includes.patch`.
 4. `drivers/misc/mediatek/base/power/swpm_v1/mtk_swpm.c` needs
-   `mtk_gpu_power_sspm_ipi.h` (exists in the stock tree only).
+   `mtk_gpu_power_sspm_ipi.h` (exists in the stock tree only). **Fixed** by 6.
 5. `mali-r32p1/drivers/gpu/arm/midgard/Makefile` and
    `imgsensor/.../gc02m1bv1_mipi_mono/Makefile` are referenced by the stock config
    but absent from the bomb tree (different Mali/sensor layout).
-6. **New (CI run #28):** `CONFIG_MTK_GPU_VERSION="mali valhall r32p1"` in the
-   current stock defconfig has no matching `mali-r32p1` directory in the bomb tree
-   (only `mali-r21p0` / `mali-r25p0`), so
-   `drivers/misc/mediatek/base/power/swpm_v1/mtk_swpm.c` cannot find
-   `mtk_gpu_power_sspm_ipi.h`. **Fix for bring-up: keep `r25p0`** (what the green
-   `bomb_user_defconfig` uses), or disable
-   `CONFIG_MTK_GPU_SWPM_SUPPORT` / `CONFIG_MTK_GPU_SUPPORT`.
+6. `CONFIG_MTK_GPU_VERSION="mali valhall r32p1"` (CI run #28) has no matching
+   `mali-r32p1` directory in the bomb tree (only `mali-r21p0` / `mali-r25p0`), so
+   `mtk_swpm.c` cannot find `mtk_gpu_power_sspm_ipi.h`. **Fixed**: keep `r25p0`
+   (same G57 IP, older DDK label).
+7. **New (CI run #30):** the stock config keeps `CONFIG_MTK_CHARGER` off (vivo
+   ships its own charge stack), but `CONFIG_MTK_GAUGE_VERSION=30` still builds the
+   MTK battery driver, which references `charger_manager_*`,
+   `charger_device_*` and `BATTERY_SetUSBState`. **Fixed**: `CONFIG_MTK_CHARGER=y`
+   (generic MTK charger provides them).
+8. **New (CI run #28):** none of the seven PD2048 image sensors exist in the bomb
+   tree, and the imgsensor Makefile turns every missing entry into a
+   `../common/v1_1/<name>/` build target. **Fixed for bring-up**:
+   `CONFIG_CUSTOM_KERNEL_IMGSENSOR=""` (camera core still builds, no sensors).
 
-Conclusion: adopting the stock config wholesale means porting a lot of vivo
-structure. The practical order is **bomb defconfig first (already green)**, then add
-PD2048 pieces one subsystem at a time. The CI default input is therefore
-`bomb_user_defconfig`; `pd2048_defconfig` is the target config and is still red at
-items 3, 4 and 6.
+Conclusion: `pd2048_defconfig` **builds as of CI run #31** (commit 8033f4a).
+The remaining work is runtime bring-up, not compilation: the stock config still
+enables many PD2048-only drivers that will fail to probe (no matching hardware
+description or no driver in the tree), which is exactly what the recovery test
+bed is for.
 
 ## Bring-up order
 
